@@ -36,12 +36,10 @@ int my_close (struct inode *, struct file *){
 }
 
 ssize_t my_read  (struct file *file, char __user *user_buffer, size_t size, loff_t *offset){
-    size_t copy_to_user(void __user *to, const void *from, unsigned long n);
-
     // less if size reached end of the buffer
     int bytes_to_read = min(size, buffer_size - *offset);
 
-    if(!copy_to_user(user_buffer, file, bytes_to_read)){
+    if(copy_to_user(user_buffer, device_buffer + *offset, bytes_to_read) != 0){
         printk(KERN_ALERT "Failed to copy to user\n");
         return -1;
     }
@@ -54,11 +52,10 @@ ssize_t my_read  (struct file *file, char __user *user_buffer, size_t size, loff
 }
 
 ssize_t my_write (struct file *file, const char __user *user_buffer, size_t size, loff_t *offset){
-    __copy_from_user(void * to, const void __user * from, unsigned long n);
 
     loff_t bytes_to_write = min(size, buffer_size - *offset);
 
-    if(!copy_from_user(user_buffer, file, bytes_to_write)){
+    if(copy_from_user(device_buffer + *offset, user_buffer, bytes_to_write) != 0){
         printk(KERN_ALERT "Failed to write to user\n");
         return -1;
     }
@@ -81,7 +78,7 @@ loff_t my_seek (struct file *file, loff_t offset, int whence){
             new_position = file->f_pos + offset;
             break;
         case 2:
-            new_position = buffer_size - offset;
+            new_position = buffer_size + offset;
             break;
     }
 
@@ -91,6 +88,8 @@ loff_t my_seek (struct file *file, loff_t offset, int whence){
     else if (new_position > buffer_size){
         new_position = buffer_size;
     }
+
+    file->f_pos = new_position;
 
     printk(KERN_ALERT "New Position: %zu", new_position);
     return new_position;
