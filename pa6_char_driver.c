@@ -91,7 +91,7 @@ loff_t my_seek (struct file *file, loff_t offset, int whence){
 
     file->f_pos = new_position;
 
-    printk(KERN_ALERT "New Position: %zu", new_position);
+    printk(KERN_ALERT "New Position: %lld",(long long) new_position);
     return new_position;
 }
 
@@ -108,7 +108,7 @@ void init_driver(){
         return;
     }
 
-    reg = ​register_chrdev(major_number, DEVICENAME, my_file_operations);
+    reg = register_chrdev(major_number, DEVICENAME, &my_file_operations);
     if(reg != 0){
         printk(KERN_ALERT "Failed to to register a character device driver with the kernel\n");
         return;
