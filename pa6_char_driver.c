@@ -4,6 +4,8 @@
 #include <linux/fs.h>
 #include <linux/uaccess.h>
 #include <linux/slab.h>
+#include <linux/init.h>
+
 
 #define BUFFERSIZE 900
 #define DEVICENAME "foo"
@@ -11,7 +13,13 @@
 static char *device_buffer;
 static int open_count = 0;
 static int close_count = 0;
-static int buffer_size = BUFFERSIZE;
+static size_t buffer_size = BUFFERSIZE;
+
+int my_open  (struct inode *, struct file *);
+int my_close (struct inode *, struct file *);
+ssize_t my_read  (struct file *, char __user *, size_t, loff_t *);
+ssize_t my_write (struct file *, const char __user *, size_t, loff_t *);
+loff_t  my_seek  (struct file *, loff_t, int);
 
 struct file_operations my_file_operations = {
     .owner   = THIS_MODULE,
@@ -37,7 +45,7 @@ int my_close (struct inode *, struct file *){
 
 ssize_t my_read  (struct file *file, char __user *user_buffer, size_t size, loff_t *offset){
     // less if size reached end of the buffer
-    int bytes_to_read = min(size, buffer_size - *offset);
+    size_t bytes_to_read = min(size, (size_t) (buffer_size - *offset));
 
     if(copy_to_user(user_buffer, device_buffer + *offset, bytes_to_read) != 0){
         printk(KERN_ALERT "Failed to copy to user\n");
@@ -52,8 +60,7 @@ ssize_t my_read  (struct file *file, char __user *user_buffer, size_t size, loff
 }
 
 ssize_t my_write (struct file *file, const char __user *user_buffer, size_t size, loff_t *offset){
-
-    loff_t bytes_to_write = min(size, buffer_size - *offset);
+    size_t bytes_to_write = min(size, (size_t)(buffer_size - *offset));
 
     if(copy_from_user(device_buffer + *offset, user_buffer, bytes_to_write) != 0){
         printk(KERN_ALERT "Failed to write to user\n");
@@ -95,7 +102,7 @@ loff_t my_seek (struct file *file, loff_t offset, int whence){
     return new_position;
 }
 
-void init_driver(){
+static int __init init_driver(){
     // register your character driver using ​register_chrdev()
     // ​register_chrdev takes: major number, a unique name, and a pointer to a file operations struct
     int major_number = 511;
@@ -105,21 +112,21 @@ void init_driver(){
     device_buffer = kmalloc(BUFFERSIZE, GFP_KERNEL);
     if(!device_buffer){
         printk(KERN_ALERT "Failed to allocate memory\n");
-        return;
+        return -1;
     }
 
     reg = register_chrdev(major_number, DEVICENAME, &my_file_operations);
     if(reg != 0){
         printk(KERN_ALERT "Failed to to register a character device driver with the kernel\n");
-        return;
+        return -1;
     }
 
     printk(KERN_ALERT "Successful init\n");
 
-    return;
+    return 0;
 }
 
-void exit_driver(){
+static void __exit exit_driver(){
     unregister_chrdev(511, DEVICENAME);
     kfree(device_buffer);
     printk(KERN_ALERT "Driver unregistered\n");
